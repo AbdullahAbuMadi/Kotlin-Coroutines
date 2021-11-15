@@ -7,9 +7,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import kotlinx.android.synthetic.main.activity_main.*
 import kotlinx.coroutines.*
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.flow.*
-import kotlin.system.measureTimeMillis
+import kotlinx.coroutines.flow.collect
 
 private const val TAG = "Main Activity "
 
@@ -20,29 +18,24 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+
         //what is runBlocking?:make block until inside {body} finished >>working in main thread.
-//        Log.d(TAG, "before")
+//        Log.d(TAG, "main thread")
 //        runBlocking {//will run our builder coroutine w/o scope.start(thread){body}
 //            printMyTextAfterDelayCoroutine("Abdullah")
-//            Log.d(TAG, "inside")
 //        }
-//        Log.d(TAG, "back")
+//        Log.d(TAG, "back to main thread ")
 ///////////////////////////////////////////////////////////////////////////////////////////
         //*parallel and not parallel>>
 //        GlobalScope.launch {
-//            GlobalScope.launch {
-//                printMyTextAfterDelayCoroutine("Abdullah1")
-//            }
-//            GlobalScope.launch {
-//                printMyTextAfterDelayCoroutine("Abdullah2")
-//            }
+//            printMyTextAfterDelayCoroutine("Abdullah1")
+//            printMyTextAfterDelayCoroutine("Abdullah2")
 //        }
-
         ////////////////////////////////////////////////////////////////////////////
 
 //         var networkData:String?=null
 //         var dataBaseData:String?=null
-//
+
 //        GlobalScope.launch {
 //            launch {networkData = getNetworkData() }
 //            launch {dataBaseData = getDataBaseData()}
@@ -52,42 +45,54 @@ class MainActivity : AppCompatActivity() {
 //            }else Log.d(TAG, "not equals")
 //        }
 //    }//in this codes will not wait until data come from get functions >>null=null>> true
-//        // in this case we need to make this (if)wait 2.5 sec until data takes variables
-//        //coroutine solved this problem by Async/Await
-
+        // in this case we need to make this (if)wait 2.5 sec until data takes variables
+        //coroutine solved this problem by Async/Await
 
 //        GlobalScope.launch {
-//            val time = measureTimeMillis {
-//                val networkData = async { getNetworkData() }//async for suspend fun
-//                val dataBaseData = async { getDataBaseData() }//will return Deferred value {String}
 //
-//                if (networkData.await() == dataBaseData.await()) {//networkData will be String after Deferred finished
-//                    Log.d(TAG, "equals")
-//                } else Log.d(TAG, "not equals")
-//            }
-//            Log.d(TAG, "time=$time")
+//        val time = measureTimeMillis {
+//            val networkData = async { getNetworkData() }//async for suspend fun
+//            val dataBaseData = async { getDataBaseData() }//will return Deferred value {String}
+//
+//            if (networkData.await() == dataBaseData.await()) {//networkData will be String after Deferred finished
+//                Log.d(TAG, "equals")
+//            } else Log.d(TAG, "not equals")
+//        }
+//        Log.d(TAG, "time=$time")
 //        }//Deferred wait value and come with it when it is ready
-//    }
 
 
 ////////////////////////////////////////////////////////////////////////
-//        val parentJop = Job()//will be parent of parent
-//        val coroutineScope:CoroutineScope= CoroutineScope(Dispatchers.IO+parentJop)//use it instead of GlobalScope
-////        coroutineScope.launch {  }//customize with IO Dispatcher+parent of it is parent jop>>in onStop()>>coroutineScope.canceled
-//        val jop: Job = GlobalScope.launch(parentJop) {
-//            val child1 = launch { getNetworkData() }
-//            val child2 = launch { getDataBaseData()}
-//            Log.d(TAG, "waiting..")
-//            joinAll(child1,child2)//or child.join()>>third launch will wait child1 and child2 finished cuz of join
-//            launch { delay(2000)
-//                Log.d(TAG, "OK")}
-//        }
-////        jop.cancel()//will cancel the parent >>childes will be canceled
-////        parentJop.cancel()//we use it to cancel all coroutines parents after onStop().
+        //Jobs
+        val parentJop = Job()//will be parent of parents
+        val coroutineScope: CoroutineScope =
+            CoroutineScope(Dispatchers.IO + parentJop)//use it instead of GlobalScope
+
+//        coroutineScope.launch {  }//customize with IO Dispatcher+parent of it is parent jop>>in onStop()>>coroutineScope.canceled
+
+        val jop: Job =
+            GlobalScope.launch(parentJop) {//launch(parentJop)>>this parent will be child of parentJob
+                val child1 = launch { getNetworkData() }
+                val child2 = launch { getDataBaseData() }
+                Log.d(TAG, "waiting..")
+                joinAll(
+                    child1,
+                    child2
+                )//or child.join()>>third launch will wait child1 and child2 finished cuz of join
+                launch {
+//                    delay(2000)
+                    Log.d(TAG, "OK")
+                }
+            }
+    }
+}
+//        jop.cancel()//will cancel the parent >>childes will be canceled
+//        parentJop.cancel()//we use it to cancel all coroutines parents after onStop().
 
         ////////////////////////////////////////////////////////////////////////////////////////
-//        //Channels
-//        //capacity of basket called (buffer)>>basket put data from 1 and 2 will take it when be ready
+        //Channels :if I have stream of values can not use Differed cuz it return 1 value
+
+        //note: capacity of basket called (buffer)>>basket put data from 1 and 2 will take it when be ready
 //        val kotlinChannel= Channel<String>()//note:rendezvous is capacity of basket will pass data from first and arrived in second by default is zero
 //
 //        val charList= arrayOf("A","B","C","D")
@@ -95,23 +100,23 @@ class MainActivity : AppCompatActivity() {
 //            //provider
 //            launch {
 //                for(char in charList){
-//                    kotlinChannel.send(char)
-////                    kotlinChannel.offer(char)//do not suspend >>using it for ex:user click 7 times and we need just the first click>>remove launch from the second coroutine and will take just A
+////                    kotlinChannel.send(char)
+//                    kotlinChannel.offer(char)//do not suspend >>using it for ex:user click 7 times and we need just the first click>>remove launch from the second coroutine and will take just A
 ////                    delay(1000)//wait 1 sec after every send
 //                }
 //            }
 //            //collector
-//            launch {
+//
 //                for(char in kotlinChannel){
-//                    delay(2000)
+////                    delay(2000)
 //                    Log.d(TAG, "here: $char")
 //                }
-//            }
+
 //        }
 
 ////////////////////////////////////////////////////
 //use flow
-//producer step
+
 //        runBlocking {
 //            flow<Int> {
 //                for (i in 1..10) {
@@ -119,16 +124,17 @@ class MainActivity : AppCompatActivity() {
 //                    delay(2000)
 //                    Log.d(TAG, "here producer $i")//will not work until collector connected
 //                }
-//            }.filter { i -> i < 5 }//intermediate step
+//            }//producer
+//                .filter { i -> i < 5 }//intermediate
 //
-//                    .buffer()//to make producer and collector parallel (everyone in coroutine )
+//                .buffer()//to make producer and collector parallel (everyone in coroutine )
 //                .collect {
 //                    delay(2000)
 //                    Log.d(TAG, "here collector $it")//like observer
 //                }//collector
 //        }//cuz collect type in suspend >>have to be inside coroutine body
 
-//    //combine more than one flow
+//    //combine more than one flow>>I want it to display at same time
 //        runBlocking {
 //            val flow1= flow<Int> {
 //                for (i in 1..3) {
@@ -153,13 +159,17 @@ class MainActivity : AppCompatActivity() {
 ///////////////////////////////////////////////////
 //        viewModel = ViewModelProvider(this).get(TimerViewModel::class.java)
 //        viewModel.startTimer()
-//        lifecycleScope.launchWhenStarted{//when started>>to stop code out of activity visible>>like liveData
+////        viewModel.timerLiveData.observe(this, {
+////            MyText.text = it.toString()
+////            Log.d(TAG, it.toString())
+////        })
+//        lifecycleScope.launch{//launchWhenStarted>>to stop code out of activity visible>>like liveData
 //            viewModel.timerStateFlow.collect {
 //                MyText.text = it.toString()
 //                Log.d(TAG, it.toString())
 //            }
 //        }
-    }
+//    }
 
 
     /**
@@ -172,18 +182,19 @@ class MainActivity : AppCompatActivity() {
      *NOT responsible to go to background thread
      *should call from another suspend fun or coroutine builder
 
-     * 3)Coroutine builder : Scope.Starting.(Thread){Body}//four parts.
+     * 3)Coroutine builder : Scope.Starting[launch or async].(Thread (Dispatchers)){Body}//four parts.
 
-     * 4)there is 5 background threads way:
-     *                  a)Main:for light operations like update data or call live data.
+     * 4)there is 4 threads way (Dispatchers):
+     *                  a)Main:for light operations like update UI or call live data.
      *                  b)Default:if we didn't select what is our thread >>it will be default.>>heavy operations.
      *                  c)input/output : call any input or output like>>room input or retrofit ..etc.
      *                  d)Unconfined: very complex thread way >>make (switching) to thread what suspend fun should be with.
-     *                  e) NewSingleThreadContext :custom thread
+     *                  e)NewSingleThreadContext :custom thread
      *
      * 5)when we make UI update should be in main thread >>put main thread way or something else then withContext()
      * what is runBlocking?:make block until inside {body} finished >>working in main thread.
      * note:if I have data come from network and from local dataBase >>we should do it parallel w/o wait
+     * note:if I put withContext inside suspend fun (I did not put Global scope)>>will not be in parallel cuz withContext is suspend function >>like I call suspend fun twice
      * cuz they are not connected to wait it.
      * 6)launch vs Async/Await :
      * launch:no return >>return job
@@ -195,7 +206,7 @@ class MainActivity : AppCompatActivity() {
      * 7)if parent job canceled >>every child will be canceled.or if any child has error parent will be canceled >>everyone depends on each other.
      * 8)join()&joinAll>>will do joined launch(childes)then do after join function code.
      *
-     * 9) if we need to wait more than one value(list ..etc)>>use Channels,open channel btw 2 coroutines>>1 ,buffer,2 by send&offer
+     * 9) if we need to wait more than one value(list ..etc)>>use Channels,open channel btw 2 coroutines>>1 ,buffer,2 : by send&offer
      *
      * 10)if producer send (suspend) data to buffer and the collector cannot collect it >>memory leak cuz producer will be suspend for ever >>to solve this problem we use Kotlin Flows
      * Note:*HotStream>>Stream is passing data with or w/o something consume this data
@@ -223,32 +234,39 @@ class MainActivity : AppCompatActivity() {
 //* Coroutine Notes:
 //         * 1)note:Continuation is the parameter give me power to stop and resume my process
 //         * (it is hiding parameter in coroutines function "suspend fun" you can find it after make java decompiler)
-//    private suspend fun printMyTextAfterDelayCoroutine(myText: String) {//should call in Coroutine builder or inside suspend fun
+//    private suspend fun printMyTextAfterDelayCoroutine(myText: String) {
+    //should call in Coroutine builder or inside suspend fun
 //        GlobalScope.launch(Dispatchers.IO) {
 //            delay(2000)//instead of Thread.Sleep()
-//            withContext(Dispatchers.Main) {
-//                MyText.text =
-//                    myText//will do fatal exception without (withContext) >>cuz we are in IO thread >>we cannot update UI thread here
-//                //should use withContext()>>switching context
-//            }
+//            Log.d(TAG, "io thread ")
+////            withContext(Dispatchers.Main) {
+////                MyText.text = myText//will do fatal exception without (withContext) >>cuz we are in IO thread >>we cannot update UI thread here
+////                //should use withContext()>>switching context
+////            }
 //        }
 ////////////////////////////////////////////////////////////////////////////////////////
-//       *parallel and not parallel>>
-//        delay(2000)
-//        Log.d(TAG, myText)//in this case Abdullah1 will print after 2 sec ,then after another 2 sec will print Abdullah2
+//        *parallel and not parallel > >
+//        GlobalScope.launch {
+//            delay(2000)
+//            Log.d(TAG, myText)
+//        }
+//    }//in this case Abdullah1 will print after 2 sec ,then after another 2 sec will print Abdullah2
 //if we want it run with coroutine should put GlobalScope.launch here or inside first GlobalScope
 ////////////////////////////////////////////////////////////////////////
     //Deferred ,async/await,Job,Join
-//    private suspend fun getNetworkData(): String {
-//        delay(2000)
-//        return "Abdullah"
-//    }
-//
-//    private suspend fun getDataBaseData(): String {
-//        delay(2000)
-//        return "Abdullah"
-//    }
-}
+    private suspend fun getNetworkData(): String {
+        delay(2000)
+        return "Abdullah"
+    }
+
+    private suspend fun getDataBaseData(): String {
+        delay(2000)
+        return "Mohammad"
+    }
+
+
+
+
 
 
 
